@@ -21,5 +21,9 @@ API:
 
 ## Восстановление базы данных
 
-Готовый дамп PostgreSQL:
-postgres/dump.sql
+Для локальной отладки можно создать ручной дамп PostgreSQL:
+
+docker compose exec postgres pg_dump -U app -d movies > movies_dump.sql
+
+Дамп не хранится в репозитории из-за ограничения GitHub.
+
