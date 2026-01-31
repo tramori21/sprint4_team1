@@ -1,28 +1,31 @@
 ﻿services:
   postgres:
     image: postgres:15-alpine
+    container_name: sprint4_team1-postgres
     env_file:
       - .env
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./postgres:/docker-entrypoint-initdb.d:ro
+      - pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-    volumes:
-      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   elasticsearch:
-    image: elasticsearch:8.6.2
+    image: elasticsearch:8.12.0
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-    ports:
-      - "9200:9200"
     volumes:
       - esdata:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
     healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200 >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -32,34 +35,32 @@
     ports:
       - "6379:6379"
 
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    env_file:
-      - .env
-    command: uvicorn src.main:app --host ${API_HOST} --port ${API_PORT}
-    ports:
-      - "8000:8000"
-    depends_on:
-      - elasticsearch
-      - redis
-
   etl:
     build:
       context: .
       dockerfile: Dockerfile.etl
     env_file:
       - .env
-    command: python -m etl.main
-    volumes:
-      - state:/state
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
     depends_on:
       elasticsearch:
         condition: service_healthy
-      postgres:
+      redis:
         condition: service_started
+    ports:
+      - "8000:8000"
 
 volumes:
-  state:
+  pgdata:
   esdata:
