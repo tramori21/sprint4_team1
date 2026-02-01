@@ -1,4 +1,8 @@
-﻿## Как проверить проект
+﻿# GitHub репозиторий проекта
+https://github.com/tramori21/sprint4_team1
+
+
+## Как проверить проект
 
 1. Склонировать репозиторий
 2. Перейти в папку проекта
@@ -27,3 +31,5 @@ docker compose exec postgres pg_dump -U app -d movies > movies_dump.sql
 
 Дамп не хранится в репозитории из-за ограничения GitHub.
 
+
+---
