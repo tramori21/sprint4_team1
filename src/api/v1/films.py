@@ -1,39 +1,39 @@
-﻿from __future__ import annotations
+﻿from fastapi import APIRouter, Request, Depends
+from http import HTTPStatus
+from elasticsearch import NotFoundError
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from elasticsearch import AsyncElasticsearch
-from redis.asyncio import Redis
+from api.deps.pagination import Pagination
 
-from src.db.elastic import get_elastic
-from src.db.redis import get_redis
-from src.services.films import FilmService
+router = APIRouter(prefix="/films", tags=["Films"])
 
 
-router = APIRouter()
-
-
-@router.get("/films", tags=["films"])
-async def films_search(
-    query: str | None = Query(default=None),
-    page: int = Query(default=1, ge=1),
-    size: int = Query(default=10, ge=1, le=100),
-    es: AsyncElasticsearch = Depends(get_elastic),
-    redis: Redis | None = Depends(get_redis),
+@router.get(
+    "",
+    summary="Список фильмов",
+    description="Возвращает список фильмов из Elasticsearch с пагинацией",
+    response_description="Список фильмов",
+    status_code=HTTPStatus.OK,
+)
+async def films_list(
+    request: Request,
+    pagination: Pagination = Depends(),
 ):
-    service = FilmService(es, redis)
-    return await service.search(query=query, page=page, size=size)
+    es = request.app.state.es
 
+    try:
+        response = await es.search(
+            index="movies",
+            body={
+                "query": {"match_all": {}},
+                "from": pagination.offset,
+                "size": pagination.page_size,
+            },
+        )
+    except NotFoundError:
+        return {"count": 0, "results": []}
 
-@router.get("/films/{film_id}", tags=["films"])
-async def film_details(
-    film_id: str,
-    es: AsyncElasticsearch = Depends(get_elastic),
-    redis: Redis | None = Depends(get_redis),
-):
-    service = FilmService(es, redis)
-    film = await service.get_by_id(film_id)
-
-    if film is None:
-        raise HTTPException(status_code=404, detail="film not found")
-
-    return film
+    hits = response["hits"]["hits"]
+    return {
+        "count": response["hits"]["total"]["value"],
+        "results": [hit["_source"] for hit in hits],
+    }
