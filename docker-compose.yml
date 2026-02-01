@@ -1,7 +1,6 @@
 ﻿services:
   postgres:
     image: postgres:15-alpine
-    container_name: sprint4_team1-postgres
     env_file:
       - .env
     volumes:
